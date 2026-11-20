@@ -2,7 +2,7 @@
   "pluginApiVersion": 1,
   "id": "salvage-plugin-instagram",
   "name": "Instagram",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "runtime": { "entry": "dist/plugin.js" },
   "provides": [],
   "contributes": [
@@ -10,7 +10,7 @@
       "id": "comments",
       "slot": "entry.detail.link.action",
       "when": { "link.provider": ["instagram"] },
-      "ui": { "kind": "button", "label": "Comments", "icon": "list" },
+      "ui": { "kind": "button", "label": "Comments", "icon": "comments" },
       "view": "text",
       "command": "comments",
       "timeoutMs": 45000
@@ -25,6 +25,13 @@
       "timeoutMs": 60000
     }
   ],
+  "auth": {
+    "url": "https://www.instagram.com",
+    "urlLabel": "Open Instagram in a browser",
+    "note": "Sign in to Instagram in a browser on this computer, copy the sessionid cookie from its storage, and paste it here. The value stays on this computer, and the web application never sees it.",
+    "secret": "sessionid",
+    "check": "check-session"
+  },
   "settings": [
     {
       "key": "sessionid",

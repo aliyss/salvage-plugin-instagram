@@ -1,4 +1,10 @@
-import { formatPost, loadComments, loadPost, sessionFrom } from "./instagram";
+import {
+  checkSession,
+  formatPost,
+  loadComments,
+  loadPost,
+  sessionFrom,
+} from "./instagram";
 import { PluginError, serve } from "./sdk";
 import { savedAnswer, saveAnswer } from "./store";
 import { modelPath, transcribe } from "./transcript";
@@ -50,8 +56,21 @@ function keptText(text: string, savedAt: number): string {
 
 export default () =>
   serve(async ({ command, params }) => {
-    if (command !== "comments" && command !== "transcript") {
+    if (
+      command !== "comments" &&
+      command !== "transcript" &&
+      command !== "check-session"
+    ) {
       throw new PluginError("unsupported", `Unknown command ${command}.`);
+    }
+
+    // The sign-in page asks this one with no entry behind it, so it is answered
+    // before a link is required.
+    if (command === "check-session") {
+      return {
+        kind: "instagram-session",
+        text: await checkSession(params.secrets?.sessionid),
+      };
     }
 
     const link = params.subject?.link?.url;

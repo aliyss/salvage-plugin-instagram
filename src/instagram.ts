@@ -277,6 +277,21 @@ export function parsePost(raw: unknown): Post | null {
   };
 }
 
+export type Account = { id: string; handle: string };
+
+/** The account a `current_user` answer names, or null when it names none. */
+export function parseAccount(raw: unknown): Account | null {
+  if (!isRecord(raw)) {
+    return null;
+  }
+  const user = isRecord(raw.user) ? raw.user : raw;
+  const handle = text(user.username);
+  if (!handle) {
+    return null;
+  }
+  return { id: text(user.pk) || text(user.id), handle };
+}
+
 /** A number as the reader writes it: `1,234`. */
 function count(value: number): string {
   return new Intl.NumberFormat("en").format(value);
@@ -641,6 +656,42 @@ export async function loadComments(
   }
 
   return { comments, refused };
+}
+
+/**
+ * Whose session this is, which is what the app's sign-in page asks the helper.
+ * A cookie Instagram no longer accepts is a sign-out, not a failure to explain.
+ */
+export async function checkSession(
+  secret: string | undefined,
+): Promise<string> {
+  const session = sessionOf(secret);
+  let refused = false;
+
+  for (const host of HOSTS) {
+    const answer = await readJson(
+      `${host}/api/v1/accounts/current_user/?edit=true`,
+      session,
+    );
+    if (!answer) {
+      continue;
+    }
+    if (answer.status === 401 || answer.status === 403) {
+      refused = true;
+      continue;
+    }
+    const account = parseAccount(answer.body);
+    if (account) {
+      return `@${account.handle}`;
+    }
+  }
+
+  throw new PluginError(
+    "refused",
+    refused
+      ? REFUSED
+      : "Instagram did not answer. Try again in a moment.",
+  );
 }
 
 /** The session the plugin was given, checked before it reaches a header. */

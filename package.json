@@ -1,6 +1,6 @@
 {
   "name": "salvage-plugin-instagram",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Reads an Instagram post's caption and comments, and transcribes a Reel, on your own computer.",

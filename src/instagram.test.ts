@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test";
 import {
   formatPost,
   mediaIdOf,
+  parseAccount,
   parseComments,
   parsePost,
   parseReplies,
@@ -174,6 +175,23 @@ describe("parseComments", () => {
     expect(parseComments({ comments: [{ text: "x" }] }).comments).toHaveLength(
       0,
     );
+  });
+});
+
+describe("parseAccount", () => {
+  it("names the account a session belongs to", () => {
+    expect(parseAccount({ user: { pk: "42", username: "someone" } })).toEqual({
+      id: "42",
+      handle: "someone",
+    });
+    expect(parseAccount({ id: "42", username: "someone" })?.handle).toBe(
+      "someone",
+    );
+  });
+
+  it("answers nothing when the session belongs to no account", () => {
+    expect(parseAccount({ user: {} })).toBeNull();
+    expect(parseAccount(null)).toBeNull();
   });
 });
 
