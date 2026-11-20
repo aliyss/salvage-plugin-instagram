@@ -1,0 +1,92 @@
+{
+  "pluginApiVersion": 1,
+  "id": "salvage-plugin-instagram",
+  "name": "Instagram",
+  "version": "0.1.0",
+  "runtime": { "entry": "dist/plugin.js" },
+  "provides": [],
+  "contributes": [
+    {
+      "id": "comments",
+      "slot": "entry.detail.link.action",
+      "when": { "link.provider": ["instagram"] },
+      "ui": { "kind": "button", "label": "Comments", "icon": "list" },
+      "view": "text",
+      "command": "comments",
+      "timeoutMs": 45000
+    },
+    {
+      "id": "transcript",
+      "slot": "entry.detail.link.action",
+      "when": { "link.provider": ["instagram"] },
+      "ui": { "kind": "button", "label": "Transcript", "icon": "transcript" },
+      "view": "transcript",
+      "command": "transcript",
+      "timeoutMs": 60000
+    }
+  ],
+  "settings": [
+    {
+      "key": "sessionid",
+      "kind": "secret",
+      "label": "Instagram session id",
+      "description": "The sessionid cookie of a browser signed in on this computer. It stays here and is never sent to your account.",
+      "maxLength": 200
+    },
+    {
+      "key": "maxComments",
+      "kind": "number",
+      "label": "How many comments",
+      "description": "Read newest first. A larger number costs another request for every fifty comments.",
+      "default": 100,
+      "min": 10,
+      "max": 500
+    },
+    {
+      "key": "includeCaption",
+      "kind": "toggle",
+      "label": "Start with the caption",
+      "description": "Put the post's own caption above the comments.",
+      "default": true
+    },
+    {
+      "key": "includeReplies",
+      "kind": "toggle",
+      "label": "Read the replies under a comment",
+      "description": "A popular post costs one request per comment for this, so the thread is stopped after twenty-five.",
+      "default": true
+    },
+    {
+      "key": "keepAnswer",
+      "kind": "toggle",
+      "label": "Keep the answer on this computer",
+      "description": "A kept answer is shown again instead of asking Instagram. It stays out of the database, so the archive cannot search it.",
+      "default": true
+    },
+    {
+      "key": "keepDays",
+      "kind": "number",
+      "label": "How many days a kept answer lasts",
+      "description": "0 keeps it until the plugin's own data is removed.",
+      "default": 7,
+      "min": 0,
+      "max": 365
+    },
+    {
+      "key": "whisperModel",
+      "kind": "text",
+      "label": "Whisper model file",
+      "description": "A GGML model outside the plugin's models folder. Left empty, the first model in that folder is used.",
+      "default": "",
+      "maxLength": 200
+    },
+    {
+      "key": "language",
+      "kind": "text",
+      "label": "Spoken language",
+      "description": "Two letters, such as en or de. auto lets whisper listen and decide.",
+      "default": "auto",
+      "maxLength": 8
+    }
+  ]
+}
