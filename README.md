@@ -87,11 +87,20 @@ folder and press **Rescan**.
 2. Open the browser's developer tools, then **Application** (Chrome) or
    **Storage** (Firefox), then **Cookies → https://www.instagram.com**.
 3. Copy the **value** of `sessionid`. It is long, and it usually ends in `%3A`.
+   Copying the whole row — `sessionid=…` — works too, and is better when the
+   browser shows `csrftoken` beside it: paste both names together, separated by
+   `; `, and the plugin sends `x-csrftoken` with the cookie. Another name in the
+   header is dropped.
 4. Paste it into **Instagram session id** on the plugin's page.
 
 The value is a secret: the helper stores it beside the plugin, and the web
 application never sees it. Signing out of that browser ends the session, so
 paste a new one after that.
+
+Instagram binds a session to the browser that made it. A value copied on one
+computer and used on another is often refused, and the refusal says so: the
+plugin reports what Instagram answered — the login page, a 401 or 403, or
+Instagram's own message — beside the check.
 
 ## Getting a transcript model
 

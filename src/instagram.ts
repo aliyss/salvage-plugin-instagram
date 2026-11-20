@@ -50,8 +50,26 @@ const SHORTCODE = /^[A-Za-z0-9_-]{5,20}$/;
 /** The paths a post code sits behind, in the order they are looked for. */
 const KIND_SEGMENTS = new Set(["p", "reel", "reels", "tv"]);
 
-/** A session is a cookie value, so it may hold nothing that ends a header. */
-const SESSION = /^[A-Za-z0-9%:._-]{8,200}$/;
+/**
+ * The cookies a signed-in browser holds that this plugin may send. Instagram
+ * signs a session with `sessionid`, and some routes also read `csrftoken`, so a
+ * browser's own cookie header is accepted as it is. Nothing else is kept: a
+ * pasted header cannot add a cookie this list does not name.
+ */
+const COOKIE_NAMES = [
+  "sessionid",
+  "csrftoken",
+  "ds_user_id",
+  "mid",
+  "ig_did",
+  "rur",
+];
+
+/** A cookie value, so it may hold nothing that ends a header. */
+const COOKIE_VALUE = /^[A-Za-z0-9%:._-]{1,300}$/;
+
+/** What this computer sends Instagram as one signed-in reader. */
+export type Session = { cookie: string; csrf: string | null };
 
 export type Comment = {
   id: string;
@@ -382,26 +400,30 @@ export function formatPost(
   return lines.join("\n").trim();
 }
 
-function headers(session: string): Record<string, string> {
+function headers(session: Session): Record<string, string> {
   return {
     "user-agent": BROWSER_USER_AGENT,
     "x-ig-app-id": APP_ID,
+    "x-ig-www-claim": "0",
     "x-requested-with": "XMLHttpRequest",
     accept: "*/*",
     "accept-language": "en-US,en;q=0.9",
     referer: "https://www.instagram.com/",
-    cookie: `sessionid=${session}`,
+    cookie: session.cookie,
+    // A route that checks the token wants it beside the cookie that carries it.
+    ...(session.csrf ? { "x-csrftoken": session.csrf } : {}),
   };
 }
 
 /** One request, read up to a limit so a large answer cannot exhaust memory. */
 async function readJson(
   url: string,
-  session: string,
+  session: Session,
+  options: { redirect?: "follow" | "manual" } = {},
 ): Promise<{ status: number; body: unknown } | null> {
   const response = await fetch(url, {
     headers: headers(session),
-    redirect: "follow",
+    redirect: options.redirect ?? "follow",
     signal: AbortSignal.timeout(TIMEOUT_MS),
   }).catch(() => null);
   if (!response) {
@@ -463,21 +485,49 @@ async function readCapped(
   return bytes.subarray(0, offset);
 }
 
-function sessionOf(raw: string | undefined): string {
-  const session = (raw ?? "").trim();
-  if (!session) {
+/**
+ * The session a pasted value names: either the `sessionid` value on its own, or
+ * the browser's whole cookie header. The header is what a browser shows first,
+ * and some routes need `csrftoken` beside `sessionid`, so both are accepted.
+ */
+export function sessionOf(raw: string | undefined): Session {
+  const pasted = (raw ?? "").trim();
+  if (!pasted) {
     throw new PluginError(
       "refused",
       "This plugin needs an Instagram session. Open Instagram in a browser on this computer, copy the sessionid cookie, and paste it on the plugin's own page.",
     );
   }
-  if (!SESSION.test(session)) {
+
+  const pairs = new Map<string, string>();
+  if (pasted.includes("=")) {
+    for (const part of pasted.split(";")) {
+      const at = part.indexOf("=");
+      if (at < 0) {
+        continue;
+      }
+      const name = part.slice(0, at).trim();
+      const value = part.slice(at + 1).trim();
+      if (!COOKIE_NAMES.includes(name) || !COOKIE_VALUE.test(value)) {
+        continue;
+      }
+      pairs.set(name, value);
+    }
+  } else if (COOKIE_VALUE.test(pasted)) {
+    pairs.set("sessionid", pasted);
+  }
+
+  if (!pairs.get("sessionid")) {
     throw new PluginError(
       "refused",
-      "That session does not look like the sessionid cookie. Copy the value only, without the cookie's name.",
+      "That does not hold a sessionid cookie. Paste the value on its own, or the browser's whole cookie header.",
     );
   }
-  return session;
+
+  return {
+    cookie: [...pairs].map(([name, value]) => `${name}=${value}`).join("; "),
+    csrf: pairs.get("csrftoken") ?? null,
+  };
 }
 
 const REFUSED =
@@ -537,7 +587,7 @@ export type CommentOptions = {
 /** The replies under one comment, at most two pages of them. */
 async function loadRepliesFor(
   commentId: string,
-  session: string,
+  session: Session,
 ): Promise<Comment[]> {
   const replies: Comment[] = [];
   let next: string | null = null;
@@ -583,7 +633,7 @@ async function loadRepliesFor(
  */
 export async function loadComments(
   postId: string,
-  session: string,
+  session: Session,
   limit: number,
   options: CommentOptions = {},
 ): Promise<{ comments: Comment[]; refused: boolean }> {
@@ -658,43 +708,69 @@ export async function loadComments(
   return { comments, refused };
 }
 
+/** The routes that name the signed-in reader, in the order they are asked. */
+const ACCOUNT_URLS = [
+  "https://i.instagram.com/api/v1/accounts/current_user/",
+  "https://www.instagram.com/api/v1/accounts/current_user/?edit=true",
+];
+
+/** Why an answer names no account, in words a reader can act on. */
+function refusalOf(answer: { status: number; body: unknown }): string {
+  if ([301, 302, 303, 307, 308].includes(answer.status)) {
+    return "Instagram served the login page";
+  }
+  if (answer.status === 401 || answer.status === 403) {
+    return `Instagram refused it (${String(answer.status)})`;
+  }
+  if (isRecord(answer.body)) {
+    const message = text(answer.body.message);
+    if (message) {
+      return message;
+    }
+  }
+  return answer.status >= 400 ? `Instagram answered ${String(answer.status)}` : "";
+}
+
 /**
  * Whose session this is, which is what the app's sign-in page asks the helper.
- * A cookie Instagram no longer accepts is a sign-out, not a failure to explain.
+ * Instagram's own answer is carried back when it names no account: a login page
+ * and a rate limit need different things from the reader, and the generic
+ * refusal hid which one it was.
  */
 export async function checkSession(
   secret: string | undefined,
 ): Promise<string> {
   const session = sessionOf(secret);
-  let refused = false;
+  const reasons: string[] = [];
 
-  for (const host of HOSTS) {
-    const answer = await readJson(
-      `${host}/api/v1/accounts/current_user/?edit=true`,
-      session,
-    );
+  for (const url of ACCOUNT_URLS) {
+    // A redirect is an answer here: it means the login page was served.
+    const answer = await readJson(url, session, { redirect: "manual" });
     if (!answer) {
+      reasons.push("Instagram did not answer");
       continue;
     }
-    if (answer.status === 401 || answer.status === 403) {
-      refused = true;
-      continue;
-    }
+
     const account = parseAccount(answer.body);
     if (account) {
       return `@${account.handle}`;
     }
+    const reason = refusalOf(answer);
+    if (reason) {
+      reasons.push(reason);
+    }
   }
 
+  const unique = [...new Set(reasons)].slice(0, 2).join("; ");
   throw new PluginError(
     "refused",
-    refused
-      ? REFUSED
-      : "Instagram did not answer. Try again in a moment.",
+    `${REFUSED}${unique ? ` Instagram said: ${unique}.` : ""}`,
   );
 }
 
 /** The session the plugin was given, checked before it reaches a header. */
-export function sessionFrom(secrets: Record<string, string> | undefined): string {
+export function sessionFrom(
+  secrets: Record<string, string> | undefined,
+): Session {
   return sessionOf(secrets?.sessionid);
 }

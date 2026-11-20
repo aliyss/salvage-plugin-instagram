@@ -17,6 +17,8 @@ import { join } from "node:path";
 
 import { PluginError } from "./sdk";
 
+import type { Session } from "./instagram";
+
 /** The caption format whisper.cpp writes, one cue per block. */
 const TIMING =
   /(\d{2}):(\d{2}):(\d{2})[,.](\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2})[,.](\d{3})/;
@@ -254,7 +256,7 @@ async function run(
 export type Transcribe = {
   videoUrl: string;
   code: string;
-  session: string;
+  session: Session;
   model: string | null;
   language: string;
   dataRoot: string;
@@ -298,7 +300,8 @@ export async function transcribe(input: Transcribe): Promise<string> {
         "user-agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
         referer: "https://www.instagram.com/",
-        cookie: `sessionid=${input.session}`,
+        cookie: input.session.cookie,
+        ...(input.session.csrf ? { "x-csrftoken": input.session.csrf } : {}),
       },
       signal: AbortSignal.timeout(Math.max(1_000, left())),
     }).catch(() => null);
