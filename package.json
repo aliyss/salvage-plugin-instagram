@@ -1,0 +1,17 @@
+{
+  "name": "salvage-plugin-instagram",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Reads an Instagram post's caption and comments, and transcribes a Reel, on your own computer.",
+  "scripts": {
+    "build": "bun build src/plugin.ts --target=bun --outfile dist/plugin.js",
+    "dev": "bun src/plugin.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.4.5"
+  }
+}
