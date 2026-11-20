@@ -11,6 +11,7 @@
  * decides what to do with it.
  */
 
+import { type Session } from "./cookies";
 import { PluginError } from "./sdk";
 
 const BROWSER_USER_AGENT =
@@ -50,26 +51,6 @@ const SHORTCODE = /^[A-Za-z0-9_-]{5,20}$/;
 /** The paths a post code sits behind, in the order they are looked for. */
 const KIND_SEGMENTS = new Set(["p", "reel", "reels", "tv"]);
 
-/**
- * The cookies a signed-in browser holds that this plugin may send. Instagram
- * signs a session with `sessionid`, and some routes also read `csrftoken`, so a
- * browser's own cookie header is accepted as it is. Nothing else is kept: a
- * pasted header cannot add a cookie this list does not name.
- */
-const COOKIE_NAMES = [
-  "sessionid",
-  "csrftoken",
-  "ds_user_id",
-  "mid",
-  "ig_did",
-  "rur",
-];
-
-/** A cookie value, so it may hold nothing that ends a header. */
-const COOKIE_VALUE = /^[A-Za-z0-9%:._-]{1,300}$/;
-
-/** What this computer sends Instagram as one signed-in reader. */
-export type Session = { cookie: string; csrf: string | null };
 
 export type Comment = {
   id: string;
@@ -485,51 +466,6 @@ async function readCapped(
   return bytes.subarray(0, offset);
 }
 
-/**
- * The session a pasted value names: either the `sessionid` value on its own, or
- * the browser's whole cookie header. The header is what a browser shows first,
- * and some routes need `csrftoken` beside `sessionid`, so both are accepted.
- */
-export function sessionOf(raw: string | undefined): Session {
-  const pasted = (raw ?? "").trim();
-  if (!pasted) {
-    throw new PluginError(
-      "refused",
-      "This plugin needs an Instagram session. Open Instagram in a browser on this computer, copy the sessionid cookie, and paste it on the plugin's own page.",
-    );
-  }
-
-  const pairs = new Map<string, string>();
-  if (pasted.includes("=")) {
-    for (const part of pasted.split(";")) {
-      const at = part.indexOf("=");
-      if (at < 0) {
-        continue;
-      }
-      const name = part.slice(0, at).trim();
-      const value = part.slice(at + 1).trim();
-      if (!COOKIE_NAMES.includes(name) || !COOKIE_VALUE.test(value)) {
-        continue;
-      }
-      pairs.set(name, value);
-    }
-  } else if (COOKIE_VALUE.test(pasted)) {
-    pairs.set("sessionid", pasted);
-  }
-
-  if (!pairs.get("sessionid")) {
-    throw new PluginError(
-      "refused",
-      "That does not hold a sessionid cookie. Paste the value on its own, or the browser's whole cookie header.",
-    );
-  }
-
-  return {
-    cookie: [...pairs].map(([name, value]) => `${name}=${value}`).join("; "),
-    csrf: pairs.get("csrftoken") ?? null,
-  };
-}
-
 const REFUSED =
   "Instagram did not accept this session. Sign in again in a browser on this computer and paste the new sessionid cookie.";
 
@@ -539,7 +475,7 @@ const REFUSED =
  */
 export async function loadPost(
   link: string,
-  secret: string | undefined,
+  session: Session,
 ): Promise<Post> {
   const code = postCodeOf(link);
   const mediaId = code ? mediaIdOf(code) : null;
@@ -549,7 +485,6 @@ export async function loadPost(
       "This link is not an Instagram post. A profile or a story has no post to read.",
     );
   }
-  const session = sessionOf(secret);
 
   let refused = false;
   for (const host of HOSTS) {
@@ -737,10 +672,7 @@ function refusalOf(answer: { status: number; body: unknown }): string {
  * and a rate limit need different things from the reader, and the generic
  * refusal hid which one it was.
  */
-export async function checkSession(
-  secret: string | undefined,
-): Promise<string> {
-  const session = sessionOf(secret);
+export async function checkSession(session: Session): Promise<string> {
   const reasons: string[] = [];
 
   for (const url of ACCOUNT_URLS) {
@@ -768,9 +700,3 @@ export async function checkSession(
   );
 }
 
-/** The session the plugin was given, checked before it reaches a header. */
-export function sessionFrom(
-  secrets: Record<string, string> | undefined,
-): Session {
-  return sessionOf(secrets?.sessionid);
-}

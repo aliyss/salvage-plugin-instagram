@@ -2,7 +2,7 @@
   "pluginApiVersion": 1,
   "id": "salvage-plugin-instagram",
   "name": "Instagram",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "runtime": { "entry": "dist/plugin.js" },
   "provides": [],
   "contributes": [
@@ -28,7 +28,7 @@
   "auth": {
     "url": "https://www.instagram.com",
     "urlLabel": "Open Instagram in a browser",
-    "note": "Sign in to Instagram in a browser on this computer, then paste the sessionid cookie from its storage: the value alone, or the whole cookie header so csrftoken comes with it. The value stays on this computer, and the web application never sees it.",
+    "note": "Sign in to Instagram in a browser on this computer, then paste the sessionid cookie from its storage: the value alone, or the whole cookie header so csrftoken comes with it. A cookies.txt export on this computer can be named in the plugin's settings instead. Neither leaves this computer.",
     "secret": "sessionid",
     "check": "check-session"
   },
@@ -38,6 +38,14 @@
       "kind": "secret",
       "label": "Instagram session id",
       "description": "The sessionid cookie of a browser signed in on this computer, or its whole cookie header when csrftoken comes with it. It stays here and is never sent to your account.",
+      "maxLength": 200
+    },
+    {
+      "key": "cookiesFile",
+      "kind": "text",
+      "label": "Cookie file",
+      "description": "A cookies.txt export from a browser on this computer. Used when no sessionid is pasted above, so a long value is never cut short.",
+      "default": "",
       "maxLength": 200
     },
     {

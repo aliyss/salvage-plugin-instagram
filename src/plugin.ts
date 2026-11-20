@@ -1,9 +1,10 @@
+import { resolveSession } from "./cookies";
 import {
   checkSession,
   formatPost,
   loadComments,
   loadPost,
-  sessionFrom,
+  postCodeOf,
 } from "./instagram";
 import { PluginError, serve } from "./sdk";
 import { savedAnswer, saveAnswer } from "./store";
@@ -65,17 +66,30 @@ export default () =>
     }
 
     // The sign-in page asks this one with no entry behind it, so it is answered
-    // before a link is required.
+    // before a link is required. A session from the paste or the cookie file is
+    // the only thing it needs.
     if (command === "check-session") {
+      const session = await resolveSession({
+        secret: params.secrets?.sessionid,
+        file: params.settings?.cookiesFile as string | undefined,
+      });
       return {
         kind: "instagram-session",
-        text: await checkSession(params.secrets?.sessionid),
+        text: await checkSession(session),
       };
     }
 
     const link = params.subject?.link?.url;
     if (!link) {
       throw new PluginError("bad_subject", "This entry has no link.");
+    }
+    // The link is read before the session is looked for, so a link that is not
+    // a post is told so before a missing session is mentioned.
+    if (!postCodeOf(link)) {
+      throw new PluginError(
+        "bad_subject",
+        "This link is not an Instagram post. A profile or a story has no post to read.",
+      );
     }
 
     const root = dataRoot();
@@ -100,10 +114,11 @@ export default () =>
       }
     }
 
-    // The post is read first: a link that is not one is answered as such, and
-    // only a post asks for the session the answer needs.
-    const post = await loadPost(link, params.secrets?.sessionid);
-    const session = sessionFrom(params.secrets);
+    const session = await resolveSession({
+      secret: params.secrets?.sessionid,
+      file: params.settings?.cookiesFile as string | undefined,
+    });
+    const post = await loadPost(link, session);
 
     if (command === "comments") {
       const { comments, refused } = await loadComments(

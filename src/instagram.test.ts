@@ -8,7 +8,6 @@ import {
   parsePost,
   parseReplies,
   postCodeOf,
-  sessionOf,
 } from "./instagram";
 
 import type { Comment, Post } from "./instagram";
@@ -176,32 +175,6 @@ describe("parseComments", () => {
     expect(parseComments({ comments: [{ text: "x" }] }).comments).toHaveLength(
       0,
     );
-  });
-});
-
-describe("sessionOf", () => {
-  it("takes the sessionid value on its own", () => {
-    expect(sessionOf("2582778888%3ASLrICY64qw5Op3")).toEqual({
-      cookie: "sessionid=2582778888%3ASLrICY64qw5Op3",
-      csrf: null,
-    });
-  });
-
-  it("takes a browser's cookie header, and drops what it may not send", () => {
-    const session = sessionOf(
-      "csrftoken=abc123; evil=drop; sessionid=258%3Axyz; ds_user_id=42",
-    );
-
-    expect(session.cookie).toBe(
-      "csrftoken=abc123; sessionid=258%3Axyz; ds_user_id=42",
-    );
-    expect(session.csrf).toBe("abc123");
-  });
-
-  it("refuses what holds no session, or cannot be a header", () => {
-    expect(() => sessionOf("")).toThrow();
-    expect(() => sessionOf("csrftoken=abc")).toThrow();
-    expect(() => sessionOf("sessionid=abc\r\nX-Evil: 1")).toThrow();
   });
 });
 

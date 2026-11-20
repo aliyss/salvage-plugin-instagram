@@ -102,6 +102,23 @@ computer and used on another is often refused, and the refusal says so: the
 plugin reports what Instagram answered — the login page, a 401 or 403, or
 Instagram's own message — beside the check.
 
+### The other way: a cookie file
+
+A long cookie is easy to cut short. Instead of pasting it, export the cookies of
+`instagram.com` from the browser on this computer as a **`cookies.txt`** file (a
+Netscape cookie file, which most cookie-export extensions write), and name that
+file in **Cookie file**:
+
+```
+/home/me/exports/instagram-cookies.txt
+```
+
+The file is read when no sessionid is pasted. Only the Instagram cookies the
+plugin sends are taken from it: `sessionid`, `csrftoken`, `ds_user_id`, `mid`,
+`ig_did` and `rur`. A row for any other host, or any other cookie name, is
+ignored, and the file is never copied anywhere. Export it again when the session
+ends, and keep the file out of a synced folder.
+
 ## Getting a transcript model
 
 Download `ggml-base.bin` (about 148 MB) or a smaller `ggml-tiny.bin` from
@@ -123,7 +140,8 @@ longer clip is stopped before the minute is up and says so.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| Instagram session id | — | The `sessionid` cookie, kept on this computer |
+| Instagram session id | — | The `sessionid` cookie or the whole cookie header, kept on this computer |
+| Cookie file | empty | A `cookies.txt` export to read when nothing is pasted |
 | How many comments | 100 | Comments read per press, newest first |
 | Start with the caption | on | Put the post's own caption above the comments |
 | Read the replies under a comment | on | Fetch a thread, up to 25 requests per press |

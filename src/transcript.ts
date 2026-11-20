@@ -17,7 +17,7 @@ import { join } from "node:path";
 
 import { PluginError } from "./sdk";
 
-import type { Session } from "./instagram";
+import type { Session } from "./cookies";
 
 /** The caption format whisper.cpp writes, one cue per block. */
 const TIMING =
